@@ -9,7 +9,6 @@ Summary:	SMARTmontools - for monitoring S.M.A.R.T. disks and devices
 License:	GPL
 Group:		System/Kernel and hardware
 URL:            http://smartmontools.sourceforge.net/
-BuildRoot:      %{_tmppath}/%{name}-%{version}-root
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
 Source3:	%{name}.bash-completion.bz2
