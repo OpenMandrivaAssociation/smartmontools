@@ -1,6 +1,6 @@
 %define name smartmontools
-%define version 5.37
-%define release %mkrel 2
+%define version 5.38
+%define release %mkrel 0.1
 
 Name:           %{name}
 Version:        %{version}
@@ -15,8 +15,6 @@ Source2:	smartd.conf
 Source3:	%{name}.bash-completion.bz2
 Source4:	readme.urpmi.%{name}
 Patch0:		smartmontools-5.33-lsb.patch
-Patch1:		smartmontools-hsm.patch
-Patch2:		smartmontools-strange_buffer.patch
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -41,8 +39,6 @@ smartd will provide more information.
 %setup -q
 bzcat %{SOURCE3} > %{name}.bash-completion
 %patch0 -p1 -b .lsb
-%patch1 -p0 -b .hsm
-%patch2 -p0 -b .buff
 
 %build
 %configure2_5x
