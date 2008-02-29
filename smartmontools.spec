@@ -1,6 +1,6 @@
 %define name smartmontools
 %define version 5.38
-%define release %mkrel 0.1
+%define release %mkrel 1
 
 Name:           %{name}
 Version:        %{version}
