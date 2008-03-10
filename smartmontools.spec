@@ -1,6 +1,6 @@
 %define name smartmontools
 %define version 5.38
-%define release %mkrel 1
+%define release %mkrel 2
 
 Name:           %{name}
 Version:        %{version}
@@ -14,7 +14,6 @@ Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}
 Source2:	smartd.conf
 Source3:	%{name}.bash-completion.bz2
 Source4:	readme.urpmi.%{name}
-Patch0:		smartmontools-5.33-lsb.patch
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -38,7 +37,6 @@ smartd will provide more information.
 %prep
 %setup -q
 bzcat %{SOURCE3} > %{name}.bash-completion
-%patch0 -p1 -b .lsb
 
 %build
 %configure2_5x
