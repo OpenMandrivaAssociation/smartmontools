@@ -5,11 +5,10 @@
 Name:           %{name}
 Version:        %{version}
 Release:        %{release}
-Summary:	SMARTmontools - for monitoring S.M.A.R.T. disks and devices
+Summary:	For monitoring S.M.A.R.T. disks and devices
 License:	GPL
 Group:		System/Kernel and hardware
-URL:            http://smartmontools.sourceforge.net/
-BuildRoot:      %{_tmppath}/%{name}-%{version}-root
+URL:        http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
 Source4:	readme.urpmi.%{name}
@@ -17,6 +16,7 @@ Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
 Requires(preun): rpm-helper
+BuildRoot:      %{_tmppath}/%{name}-%{version}
 
 %description 
 SMARTmontools controls and monitors storage devices using the
@@ -41,13 +41,13 @@ smartd will provide more information.
 %make
 
 %install
-rm -rf $RPM_BUILD_ROOT
+rm -rf %{buildroot}
 %makeinstall_std
-install %{SOURCE2} $RPM_BUILD_ROOT/etc/
-install %{SOURCE4} $RPM_BUILD_ROOT/%_docdir/%name-%version/README.urpmi
+install %{SOURCE2} %{buildroot}/etc/
+install %{SOURCE4} %{buildroot}/%_docdir/%name-%version/README.urpmi
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf %{buildroot}
 
 %post
 %_post_service smartd
@@ -58,7 +58,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%attr(644,root,root) %config(noreplace) %{_sysconfdir}/smartd.conf
+%config(noreplace) %{_sysconfdir}/smartd.conf
 %{_initrddir}/smartd
 %{_sbindir}/*
 %{_mandir}/man?/*
