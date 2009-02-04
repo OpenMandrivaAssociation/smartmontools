@@ -11,7 +11,6 @@ Group:		System/Kernel and hardware
 URL:        http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
-Source4:	readme.urpmi.%{name}
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -44,7 +43,6 @@ smartd will provide more information.
 rm -rf %{buildroot}
 %makeinstall_std
 install %{SOURCE2} %{buildroot}/etc/
-install %{SOURCE4} %{buildroot}/%_docdir/%name-%version/README.urpmi
 
 %clean
 rm -rf %{buildroot}
@@ -63,5 +61,3 @@ rm -rf %{buildroot}
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}-%{version}
-
-
