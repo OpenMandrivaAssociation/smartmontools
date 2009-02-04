@@ -11,6 +11,7 @@ Group:		System/Kernel and hardware
 URL:        http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
+Patch:      smartmontools-5.38-fix-format-errors.patch
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -34,6 +35,7 @@ smartd will provide more information.
 
 %prep
 %setup -q
+%patch -p 1
 
 %build
 %configure2_5x
@@ -44,6 +46,8 @@ rm -rf %{buildroot}
 %makeinstall_std
 install %{SOURCE2} %{buildroot}/etc/
 
+mv %{buildroot}%{_docdir}/%{name}-%{version} %{buildroot}%{_docdir}/%{name}
+
 %clean
 rm -rf %{buildroot}
 
@@ -53,11 +57,10 @@ rm -rf %{buildroot}
 %preun
 %_preun_service smartd
 
-
 %files
 %defattr(-,root,root)
 %config(noreplace) %{_sysconfdir}/smartd.conf
 %{_initrddir}/smartd
 %{_sbindir}/*
 %{_mandir}/man?/*
-%{_docdir}/%{name}-%{version}
+%{_docdir}/%{name}
