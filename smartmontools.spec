@@ -1,6 +1,6 @@
 %define name smartmontools
 %define version 5.38
-%define release %mkrel 3
+%define release %mkrel 4
 
 Name:           %{name}
 Version:        %{version}
@@ -12,7 +12,6 @@ URL:            http://smartmontools.sourceforge.net/
 BuildRoot:      %{_tmppath}/%{name}-%{version}-root
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
-Source3:	%{name}.bash-completion.bz2
 Source4:	readme.urpmi.%{name}
 Obsoletes:	smartsuite
 Provides:	smartsuite
@@ -36,7 +35,6 @@ smartd will provide more information.
 
 %prep
 %setup -q
-bzcat %{SOURCE3} > %{name}.bash-completion
 
 %build
 %configure2_5x
@@ -47,10 +45,6 @@ rm -rf $RPM_BUILD_ROOT
 %makeinstall_std
 install %{SOURCE2} $RPM_BUILD_ROOT/etc/
 install %{SOURCE4} $RPM_BUILD_ROOT/%_docdir/%name-%version/README.urpmi
-
-# bash completion
-install -d -m 755 %{buildroot}%{_sysconfdir}/bash_completion.d
-install -m 644 %{name}.bash-completion %{buildroot}%{_sysconfdir}/bash_completion.d/%{name}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -65,7 +59,6 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %attr(644,root,root) %config(noreplace) %{_sysconfdir}/smartd.conf
-%{_sysconfdir}/bash_completion.d/%{name}
 %{_initrddir}/smartd
 %{_sbindir}/*
 %{_mandir}/man?/*
