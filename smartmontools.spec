@@ -1,6 +1,6 @@
 %define name smartmontools
-%define version 5.38
-%define release %mkrel 5
+%define version 5.39
+%define release %mkrel 1
 
 Name:           %{name}
 Version:        %{version}
@@ -11,7 +11,6 @@ Group:		System/Kernel and hardware
 URL:        http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source2:	smartd.conf
-Patch:      smartmontools-5.38-fix-format-errors.patch
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -35,7 +34,6 @@ smartd will provide more information.
 
 %prep
 %setup -q
-%patch -p 1
 
 %build
 %configure2_5x
