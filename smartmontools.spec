@@ -1,5 +1,5 @@
 %define name smartmontools
-%define version 5.39
+%define version 5.39.1
 %define release %mkrel 1
 
 Name:           %{name}
@@ -36,7 +36,7 @@ smartd will provide more information.
 %setup -q
 
 %build
-%configure2_5x
+%configure2_5x --enable-drivedb
 %make
 
 %install
@@ -62,3 +62,4 @@ rm -rf %{buildroot}
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}
+%{_datadir}/%{name}/drivedb.h
