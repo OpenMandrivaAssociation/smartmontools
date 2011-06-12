@@ -44,6 +44,7 @@ man smartctl and man smartd will provide more information.
 rm -rf %{buildroot}
 
 install -d %{buildroot}%{_sysconfdir}/sysconfig
+install -d %{buildroot}%{_initrddir}
 
 %makeinstall_std
 
