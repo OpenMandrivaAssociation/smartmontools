@@ -70,3 +70,4 @@ rm -rf %{buildroot}
 %{_mandir}/man?/*
 %{_docdir}/%{name}
 %{_datadir}/%{name}/drivedb.h
+/lib/systemd/system/smartd.service
