@@ -1,8 +1,8 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
-Name:           smartmontools
-Version:        5.42
-Release:        %mkrel 1
-License:	GPL
+Name:		smartmontools
+Version:	5.42
+Release:	%mkrel 2
+License:	GPLv2
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
@@ -11,10 +11,10 @@ Source2:	smartd.service
 Source3:	smartd.sysconfig
 Requires(post):	rpm-helper
 Requires(preun): rpm-helper
-Requires(post): systemd-units
+Requires(post):	systemd-units
 Requires(preun): systemd-units
 Requires(postun): systemd-units
-Requires(post): systemd-sysv
+Requires(post):	systemd-sysv
 BuildRequires:	libcap-ng-devel
 BuildRequires:	systemd-units
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
