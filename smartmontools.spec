@@ -9,7 +9,7 @@ Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}
 Source1:	smartd.conf
 Source2:	smartd.init
 Source3:	smartd.sysconfig
-Patch0:		smartmontools-5.42-service.patch
+Patch0:		smartmontools-6.0-service.patch
 Obsoletes:	smartsuite
 Provides:	smartsuite
 Requires(post):	rpm-helper
@@ -32,7 +32,7 @@ man smartctl and man smartd will provide more information.
 
 %prep
 %setup -q
-%patch0 -p1
+%patch0 -p0
 
 %build
 %configure2_5x \
