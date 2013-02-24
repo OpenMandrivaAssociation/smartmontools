@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	5.41
-Release:	%mkrel 5
+Version:	6.0
+Release:	1
 License:	GPLv2
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
