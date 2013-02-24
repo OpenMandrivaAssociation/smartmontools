@@ -1,0 +1,13 @@
+--- smartd.service.in.orig	2013-02-24 14:39:27.022465107 +0000
++++ smartd.service.in	2013-02-24 14:39:38.414465568 +0000
+@@ -3,8 +3,8 @@
+ After=syslog.target
+ 
+ [Service]
+-EnvironmentFile=-/usr/local/etc/sysconfig/smartmontools
+-ExecStart=/usr/local/sbin/smartd -n $smartd_opts
++EnvironmentFile=/etc/sysconfig/smartd
++ExecStart=/usr/sbin/smartd -n $smartd_opt
+ ExecReload=/bin/kill -HUP $MAINPID
+ StandardOutput=syslog
+ 
