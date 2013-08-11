@@ -1,2 +1,4 @@
+removed_sources:
+  smartmontools-6.0.tar.gz: 752a6c087c09b203c229da3b1506a8c40a5158ad
 sources:
-  "smartmontools-6.0.tar.gz": 752a6c087c09b203c229da3b1506a8c40a5158ad
+  smartmontools-6.2.tar.gz: 37848ff5103d68b672463a30cd99e7d23d6696a5
