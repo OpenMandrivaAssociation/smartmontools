@@ -65,7 +65,7 @@ pushd uclibc
 %uclibc_configure \
 	--with-libcap-ng=no \
 	--enable-drivedb \
-	--with-docdir=%{_datadir}/doc/smartmontools \
+	--docdir=%{_docdir}/smartmontools \
 	--with-initscriptdir=no
 %make
 popd
@@ -77,8 +77,7 @@ pushd glibc
 	--with-libcap-ng=yes \
 	--enable-drivedb \
 	--with-initscriptdir=no \
-	--with-systemdsystemunitdir=%{_unitdir} \
-	--sysconfdir=%{_sysconfdir}/%{name}/
+	--with-systemdsystemunitdir=%{_unitdir}
 %make
 popd
 
@@ -89,10 +88,9 @@ rm %{buildroot}%{uclibc_root}%{_sbindir}/update-smart-drivedb
 %endif
 %makeinstall_std -C glibc
 
-install %{SOURCE1} %{buildroot}%{_sysconfdir}/
-install %{SOURCE3} %{buildroot}%{_sysconfdir}/sysconfig/smartd
-install -p -m644 %{SOURCE4} -D %{buildroot}/lib/systemd/system/smartd.service
-rm  %{buildroot}%{_initrddir}/smartd
+install %{SOURCE1} -D %{buildroot}%{_sysconfdir}/smartd.conf
+install %{SOURCE3} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
+install -p -m644 %{SOURCE4} -D %{buildroot}%{_unitdir}/smartd.service
 
 %post
 %_post_service smartd
