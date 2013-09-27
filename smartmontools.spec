@@ -1,23 +1,23 @@
 %bcond_without	uclibc
 
-Summary:	  For monitoring S.M.A.R.T. disks and devices
-Name:             smartmontools
-Version:          6.2
-Release:          2
-License:	  GPL
-Group:		  System/Kernel and hardware
-URL:		  http://smartmontools.sourceforge.net/
-Source0:	  http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
-Source1:	  smartd.conf
-Source3:	  smartd.sysconfig
-Source4:          smartd.service
-Patch0:		  smartmontools-6.0-service.patch
-Obsoletes:	  smartsuite
-Provides:	  smartsuite
-Requires(post):  rpm-helper
-Requires(preun): rpm-helper
-BuildRequires:    systemd-units
-BuildRequires:	  libcap-ng-devel
+Summary:	For monitoring S.M.A.R.T. disks and devices
+Name:		smartmontools
+Version:	6.2
+Release:	2
+License:	GPLv2+
+Group:		System/Kernel and hardware
+URL:		http://smartmontools.sourceforge.net/
+Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
+Source1:	smartd.conf
+Source3:	smartd.sysconfig
+Source4:	smartd.service
+Patch0:		smartmontools-6.0-service.patch
+Obsoletes:	smartsuite
+Provides:	smartsuite
+Requires(post):	rpm-helper
+Requires(preun):rpm-helper
+BuildRequires:	systemd-units
+BuildRequires:	libcap-ng-devel
 %if %{with uclibc}
 BuildRequires:	uClibc-devel
 %endif
@@ -54,7 +54,6 @@ ATA/ATAPI-7 specifications. The package is intended to incorporate as much
 man smartctl and man smartd will provide more information.
 
 %prep
-
 %setup -q
 %patch0 -p0
 
@@ -66,7 +65,8 @@ pushd uclibc
 %uclibc_configure \
 	--with-libcap-ng=no \
 	--enable-drivedb \
-	--with-docdir=%{_datadir}/doc/smartmontools
+	--with-docdir=%{_datadir}/doc/smartmontools \
+	--with-initscriptdir=no
 %make
 popd
 %endif
@@ -74,13 +74,15 @@ popd
 mkdir -p glibc
 pushd glibc
 %configure2_5x \
-    --with-libcap-ng=yes \
-    --enable-drivedb
+	--with-libcap-ng=yes \
+	--enable-drivedb \
+	--with-initscriptdir=no \
+	--with-systemdsystemunitdir=%{_unitdir} \
+	--sysconfdir=%{_sysconfdir}/%{name}/
 %make
 popd
 
 %install
-install -d %{buildroot}%{_sysconfdir}/sysconfig
 %if %{with uclibc}
 %makeinstall_std -C uclibc
 rm %{buildroot}%{uclibc_root}%{_sbindir}/update-smart-drivedb
@@ -89,8 +91,8 @@ rm %{buildroot}%{uclibc_root}%{_sbindir}/update-smart-drivedb
 
 install %{SOURCE1} %{buildroot}%{_sysconfdir}/
 install %{SOURCE3} %{buildroot}%{_sysconfdir}/sysconfig/smartd
-install -D -p -m 644 %{SOURCE4} %{buildroot}/lib/systemd/system/smartd.service
-rm -f %{buildroot}%{_initrddir}/smartd
+install -p -m644 %{SOURCE4} -D %{buildroot}/lib/systemd/system/smartd.service
+rm  %{buildroot}%{_initrddir}/smartd
 
 %post
 %_post_service smartd
@@ -102,7 +104,7 @@ rm -f %{buildroot}%{_initrddir}/smartd
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) /lib/systemd/system/smartd.service
+%attr(0644,root,root) %{_unitdir}/smartd.service
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}
