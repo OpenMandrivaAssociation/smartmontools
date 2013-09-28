@@ -19,7 +19,7 @@ Requires(preun):rpm-helper
 BuildRequires:	systemd-units
 BuildRequires:	libcap-ng-devel
 %if %{with uclibc}
-BuildRequires:	uClibc-devel
+BuildRequires:	uClibc-devel uClibc++-devel
 %endif
 
 %description 
