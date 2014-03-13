@@ -8,12 +8,12 @@ License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
-Source1:	smartd.conf
-Source3:	smartd.sysconfig
-Source4:	smartd.service
+Source1:	%{name}.rpmlintrc
+Source2:	smartd.sysconfig
 Patch0:		smartmontools-6.0-service.patch
-Obsoletes:	smartsuite
-Provides:	smartsuite
+Patch1:		smartmontools-6.2-preserve-same-sysconfig-variable-for-use.patch
+Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
+%rename		smartsuite
 Requires(post):	rpm-helper
 Requires(preun):rpm-helper
 BuildRequires:	systemd-units
@@ -56,6 +56,8 @@ man smartctl and man smartd will provide more information.
 %prep
 %setup -q
 %patch0 -p0
+%patch1 -p1 -b .sysconfig~
+%patch2 -p1 -b .conf~
 
 %build
 export CONFIGURE_TOP="$PWD"
@@ -88,9 +90,7 @@ rm %{buildroot}%{uclibc_root}%{_sbindir}/update-smart-drivedb
 %endif
 %makeinstall_std -C glibc
 
-install %{SOURCE1} -D %{buildroot}%{_sysconfdir}/smartd.conf
-install %{SOURCE3} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
-install -p -m644 %{SOURCE4} -D %{buildroot}%{_unitdir}/smartd.service
+install -p -m644 %{SOURCE2} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
 
 %post
 %_post_service smartd
@@ -99,7 +99,7 @@ install -p -m644 %{SOURCE4} -D %{buildroot}%{_unitdir}/smartd.service
 %_preun_service smartd
 
 %files
-%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd.conf
+%config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
 %attr(0644,root,root) %{_unitdir}/smartd.service
