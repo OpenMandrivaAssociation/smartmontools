@@ -9,6 +9,7 @@ Source0:	  http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{versio
 Source1:	  smartd.conf
 Source3:	  smartd.sysconfig
 Source4:          smartd.service
+Source5:	%{name}.rpmlintrc
 Patch0:		  smartmontools-6.0-service.patch
 Obsoletes:	  smartsuite
 Provides:	  smartsuite
