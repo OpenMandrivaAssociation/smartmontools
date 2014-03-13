@@ -6,10 +6,11 @@ License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
-Source1:	smartd.conf
-Source3:	smartd.sysconfig
-Source5:	%{name}.rpmlintrc
+Source1:	%{name}.rpmlintrc
+Source2:	smartd.sysconfig
 Patch0:		smartmontools-6.0-service.patch
+Patch1:		smartmontools-6.2-preserve-same-sysconfig-variable-for-use.patch
+Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
 Requires(post):	rpm-helper
 Requires(preun):rpm-helper
@@ -32,6 +33,8 @@ man smartctl and man smartd will provide more information.
 %prep
 %setup -q
 %patch0 -p0
+%patch1 -p1 -b .sysconfig~
+%patch2 -p1 -b .conf~
 
 %build
 %configure2_5x	--with-libcap-ng=yes \
@@ -42,8 +45,7 @@ man smartctl and man smartd will provide more information.
 %install
 %makeinstall_std
 
-install -p -m644 %{SOURCE1} -D %{buildroot}%{_sysconfdir}/smartd.conf
-install -p -m644 %{SOURCE3} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
+install -p -m644 %{SOURCE2} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
 
 %post
 %_post_service smartd
