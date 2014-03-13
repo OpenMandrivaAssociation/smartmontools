@@ -8,7 +8,6 @@ URL:		http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source1:	smartd.conf
 Source3:	smartd.sysconfig
-Source4:	smartd.service
 Source5:	%{name}.rpmlintrc
 Patch0:		smartmontools-6.0-service.patch
 %rename		smartsuite
@@ -45,7 +44,6 @@ man smartctl and man smartd will provide more information.
 
 install -p -m644 %{SOURCE1} -D %{buildroot}%{_sysconfdir}/smartd.conf
 install -p -m644 %{SOURCE3} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
-install -p -m644 %{SOURCE4} -D %{buildroot}/lib/systemd/system/smartd.service
 
 %post
 %_post_service smartd
@@ -57,7 +55,6 @@ install -p -m644 %{SOURCE4} -D %{buildroot}/lib/systemd/system/smartd.service
 %config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) %{_unitdir}/smartd.service
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}
