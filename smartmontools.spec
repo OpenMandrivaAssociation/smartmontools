@@ -1,22 +1,21 @@
-Summary:	  For monitoring S.M.A.R.T. disks and devices
-Name:             smartmontools
-Version:          6.2
-Release:          5
-License:	  GPL
-Group:		  System/Kernel and hardware
-URL:		  http://smartmontools.sourceforge.net/
-Source0:	  http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
-Source1:	  smartd.conf
-Source3:	  smartd.sysconfig
-Source4:          smartd.service
+Summary:	For monitoring S.M.A.R.T. disks and devices
+Name:		smartmontools
+Version:	6.2
+Release:	6
+License:	GPLv2+
+Group:		System/Kernel and hardware
+URL:		http://smartmontools.sourceforge.net/
+Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
+Source1:	smartd.conf
+Source3:	smartd.sysconfig
+Source4:	smartd.service
 Source5:	%{name}.rpmlintrc
-Patch0:		  smartmontools-6.0-service.patch
-Obsoletes:	  smartsuite
-Provides:	  smartsuite
-Requires(post):  rpm-helper
-Requires(preun): rpm-helper
-BuildRequires:    systemd-units
-BuildRequires:	  libcap-ng-devel
+Patch0:		smartmontools-6.0-service.patch
+%rename		smartsuite
+Requires(post):	rpm-helper
+Requires(preun):rpm-helper
+BuildRequires:	systemd-units
+BuildRequires:	libcap-ng-devel
 
 %description 
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
@@ -32,26 +31,21 @@ ATA/ATAPI-7 specifications. The package is intended to incorporate as much
 man smartctl and man smartd will provide more information.
 
 %prep
-
 %setup -q
-#% apply_patches
 %patch0 -p0
+
 %build
-%configure2_5x \
-    --with-libcap-ng=yes \
-    --enable-drivedb
+%configure2_5x	--with-libcap-ng=yes \
+		--enable-drivedb
 
 %make
 
 %install
-install -d %{buildroot}%{_sysconfdir}/sysconfig
-
 %makeinstall_std
 
-install %{SOURCE1} %{buildroot}%{_sysconfdir}/
-install %{SOURCE3} %{buildroot}%{_sysconfdir}/sysconfig/smartd
-install -D -p -m 644 %{SOURCE4} %{buildroot}/lib/systemd/system/smartd.service
-rm -f %{buildroot}%{_initrddir}/smartd
+install -p -m644 %{SOURCE1} -D %{buildroot}%{_sysconfdir}/smartd.conf
+install -p -m644 %{SOURCE3} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
+install -p -m644 %{SOURCE4} -D %{buildroot}/lib/systemd/system/smartd.service
 
 %post
 %_post_service smartd
@@ -60,10 +54,10 @@ rm -f %{buildroot}%{_initrddir}/smartd
 %_preun_service smartd
 
 %files
-%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd.conf
+%config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
-%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) /lib/systemd/system/smartd.service
+%config(noreplace) %{_sysconfdir}/sysconfig/smartd
+%attr(0644,root,root) %{_unitdir}/smartd.service
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}
