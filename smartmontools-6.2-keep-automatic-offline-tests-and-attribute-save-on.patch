@@ -1,0 +1,11 @@
+--- smartmontools-6.2/smartd.conf~	2012-10-18 17:11:36.000000000 +0200
++++ smartmontools-6.2/smartd.conf	2014-03-13 08:05:19.268785234 +0100
+@@ -20,7 +20,7 @@
+ # Directives listed below, which will be applied to all devices that
+ # are found.  Most users should comment out DEVICESCAN and explicitly
+ # list the devices that they wish to monitor.
+-DEVICESCAN
++DEVICESCAN -a -o on -S on
+ 
+ # Alternative setting to ignore temperature and power-on hours reports
+ # in syslog.
