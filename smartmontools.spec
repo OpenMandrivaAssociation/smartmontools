@@ -2,8 +2,8 @@
 
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	6.2
-Release:	7
+Version:	6.3
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -68,14 +68,14 @@ pushd uclibc
 	--with-libcap-ng=no \
 	--enable-drivedb \
 	--docdir=%{_docdir}/smartmontools \
-	--with-initscriptdir=no
+	--with-initscriptdir=no CXXFLAGS=-std=c++11
 %make
 popd
 %endif
 
 mkdir -p glibc
 pushd glibc
-%configure2_5x \
+%configure \
 	--with-libcap-ng=yes \
 	--enable-drivedb \
 	--with-initscriptdir=no \
