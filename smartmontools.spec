@@ -1,4 +1,4 @@
-%bcond_without	uclibc
+%bcond_with	uclibc
 
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
@@ -35,6 +35,7 @@ ATA/ATAPI-7 specifications. The package is intended to incorporate as much
 "vendor specific" and "reserved" information as possible about disk drives.
 man smartctl and man smartd will provide more information.
 
+%if %{with uclibc}
 %package -n	uclibc-%{name}
 Summary:	For monitoring S.M.A.R.T. disks and devices (uClibc build)
 Group:		System/Kernel and hardware
@@ -52,6 +53,7 @@ specification. Future releases will be compatible with the ATA/ATAPI-6 and
 ATA/ATAPI-7 specifications. The package is intended to incorporate as much
 "vendor specific" and "reserved" information as possible about disk drives.
 man smartctl and man smartd will provide more information.
+%endif
 
 %prep
 %setup -q
