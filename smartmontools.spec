@@ -14,7 +14,7 @@ Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.pa
 %rename		smartsuite
 Requires(post):	rpm-helper
 Requires(preun):rpm-helper
-BuildRequires:	systemd-units
+BuildRequires:	systemd
 BuildRequires:	libcap-ng-devel
 
 %description 
@@ -64,4 +64,3 @@ EOF
 %{_mandir}/man?/*
 %{_docdir}/%{name}
 %{_datadir}/%{name}/drivedb.h
-
