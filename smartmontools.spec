@@ -14,8 +14,8 @@ Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.pa
 %rename		smartsuite
 Requires(post):	rpm-helper
 Requires(preun):	rpm-helper
-#BuildRequires:	pkgconfig(libsystemd)
-#BuildRequires:	libcap-ng-devel
+BuildRequires:	pkgconfig(libsystemd)
+BuildRequires:	libcap-ng-devel
 
 %description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
