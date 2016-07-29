@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	6.4
-Release:	3
+Version:	6.5
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -13,11 +13,11 @@ Patch1:		smartmontools-6.2-preserve-same-sysconfig-variable-for-use.patch
 Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
 Requires(post):	rpm-helper
-Requires(preun):rpm-helper
-BuildRequires:	systemd-units
+Requires(preun):	rpm-helper
+BuildRequires:	pkgconfig(libsystemd)
 BuildRequires:	libcap-ng-devel
 
-%description 
+%description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
 Analysis and Reporting Technology System (S.M.A.R.T.) built into ATA and SCSI
 Hard Drives. This is used to check the reliability of the hard drive and
@@ -39,9 +39,10 @@ man smartctl and man smartd will provide more information.
 %build
 %configure \
 	--with-libcap-ng=yes \
-	--enable-drivedb \
+	--with-drivedbdir=yes \
+	--with-update-smart-drivedb=yes \
 	--with-initscriptdir=no \
-	--with-systemdsystemunitdir=%{_unitdir}
+	--with-systemdsystemunitdir=%{_systemunitdir}
 
 %make BUILD_INFO='"(%{distribution} %{version}-%{release})"'
 
@@ -58,10 +59,9 @@ EOF
 %config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) %{_unitdir}/smartd.service
+%attr(0644,root,root) %{_systemunitdir}/smartd.service
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
 %{_mandir}/man?/*
 %{_docdir}/%{name}
 %{_datadir}/%{name}/drivedb.h
-
