@@ -14,8 +14,8 @@ Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.pa
 %rename		smartsuite
 Requires(post):	rpm-helper
 Requires(preun):	rpm-helper
-BuildRequires:	pkgconfig(libsystemd)
-BuildRequires:	libcap-ng-devel
+#BuildRequires:	pkgconfig(libsystemd)
+#BuildRequires:	libcap-ng-devel
 
 %description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
@@ -39,9 +39,10 @@ man smartctl and man smartd will provide more information.
 %build
 %configure \
 	--with-libcap-ng=yes \
-	--enable-drivedb \
+	--with-drivedbdir=yes \
+	--with-update-smart-drivedb=yes \
 	--with-initscriptdir=no \
-	--with-systemdsystemunitdir=%{_unitdir}
+	--with-systemdsystemunitdir=%{_systemunitdir}
 
 %make BUILD_INFO='"(%{distribution} %{version}-%{release})"'
 
@@ -58,7 +59,7 @@ EOF
 %config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) %{_unitdir}/smartd.service
+%attr(0644,root,root) %{_systemunitdir}/smartd.service
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
 %{_mandir}/man?/*
