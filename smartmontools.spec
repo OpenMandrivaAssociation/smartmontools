@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	6.4
-Release:	3
+Version:	6.5
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -13,11 +13,11 @@ Patch1:		smartmontools-6.2-preserve-same-sysconfig-variable-for-use.patch
 Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
 Requires(post):	rpm-helper
-Requires(preun):rpm-helper
-BuildRequires:	systemd
+Requires(preun):	rpm-helper
+BuildRequires:	pkgconfig(libsystemd)
 BuildRequires:	libcap-ng-devel
 
-%description 
+%description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
 Analysis and Reporting Technology System (S.M.A.R.T.) built into ATA and SCSI
 Hard Drives. This is used to check the reliability of the hard drive and
