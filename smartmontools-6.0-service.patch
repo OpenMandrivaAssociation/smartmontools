@@ -7,7 +7,7 @@
 -EnvironmentFile=-/usr/local/etc/sysconfig/smartmontools
 -ExecStart=/usr/local/sbin/smartd -n $smartd_opts
 +EnvironmentFile=/etc/sysconfig/smartd
-+ExecStart=/usr/sbin/smartd -n $smartd_opt
++ExecStart=/usr/sbin/smartd -n $SMARTD_OPTIONS
  ExecReload=/bin/kill -HUP $MAINPID
  StandardOutput=syslog
  

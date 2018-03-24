@@ -1,6 +1,6 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	6.5
+Version:	6.6
 Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
@@ -9,11 +9,8 @@ Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}
 Source1:	%{name}.rpmlintrc
 Source2:	smartd.sysconfig
 Patch0:		smartmontools-6.0-service.patch
-Patch1:		smartmontools-6.2-preserve-same-sysconfig-variable-for-use.patch
-Patch2:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
+Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
-Requires(post):	rpm-helper
-Requires(preun):	rpm-helper
 BuildRequires:	pkgconfig(libsystemd)
 BuildRequires:	libcap-ng-devel
 
