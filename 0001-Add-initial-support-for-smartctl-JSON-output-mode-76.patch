@@ -1,0 +1,1519 @@
+From 931af88b1a86ecf42010e458fb978e293d141915 Mon Sep 17 00:00:00 2001
+From: Alex <alexander@mezon.ru>
+Date: Mon, 28 May 2018 14:14:58 +0000
+Subject: [PATCH] 0001-Add-initial-support-for-smartctl-JSON-output-mode-76
+
+---
+ Makefile.am   |   2 +
+ ataprint.cpp  | 186 +++++++++++++++++++++++++++++----------
+ json.cpp      | 274 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ json.h        | 138 +++++++++++++++++++++++++++++
+ scsiprint.cpp |  87 ++++++++++++-------
+ smartctl.8.in |  19 ++++
+ smartctl.cpp  | 242 +++++++++++++++++++++++++++++++++++++++++++--------
+ smartctl.h    |  20 ++++-
+ 8 files changed, 855 insertions(+), 113 deletions(-)
+ create mode 100644 json.cpp
+ create mode 100644 json.h
+
+diff --git a/Makefile.am b/Makefile.am
+index 7540f57..1ea3137 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -70,6 +70,8 @@ smartctl_SOURCES = \
+         dev_tunnelled.h \
+         drivedb.h \
+         int64.h \
++        json.cpp \
++        json.h \
+         knowndrives.cpp \
+         knowndrives.h \
+         nvmecmds.cpp \
+diff --git a/ataprint.cpp b/ataprint.cpp
+index 4516222..cbc5b37 100644
+--- a/ataprint.cpp
++++ b/ataprint.cpp
+@@ -608,18 +608,26 @@ static void print_drive_info(const ata_identify_device * drive,
+   ata_format_id_string(firmware, drive->fw_rev, sizeof(firmware)-1);
+ 
+   // Print model family if known
+-  if (dbentry && *dbentry->modelfamily)
+-    pout("Model Family:     %s\n", dbentry->modelfamily);
++  if (dbentry && *dbentry->modelfamily) {
++    jout("Model Family:     %s\n", dbentry->modelfamily);
++    jglb["model_family"] = dbentry->modelfamily;
++  }
+ 
+-  pout("Device Model:     %s\n", infofound(model));
++  jout("Device Model:     %s\n", infofound(model));
++  jglb["model_name"] = model;
+ 
+   if (!dont_print_serial_number) {
+-    pout("Serial Number:    %s\n", infofound(serial));
++    jout("Serial Number:    %s\n", infofound(serial));
++    jglb["serial_number"] = serial;
+ 
+     unsigned oui = 0; uint64_t unique_id = 0;
+     int naa = ata_get_wwn(drive, oui, unique_id);
+-    if (naa >= 0)
+-      pout("LU WWN Device Id: %x %06x %09" PRIx64 "\n", naa, oui, unique_id);
++    if (naa >= 0) {
++      jout("LU WWN Device Id: %x %06x %09" PRIx64 "\n", naa, oui, unique_id);
++      jglb["wwn"]["naa"] = naa;
++      jglb["wwn"]["oui"] = oui;
++      jglb["wwn"]["id"]  = unique_id;
++    }
+   }
+ 
+   // Additional Product Identifier (OEM Id) string in words 170-173
+@@ -627,39 +635,47 @@ static void print_drive_info(const ata_identify_device * drive,
+   if (0x2020 <= drive->words088_255[170-88] && drive->words088_255[170-88] <= 0x7e7e) {
+     char add[8+1];
+     ata_format_id_string(add, (const unsigned char *)(drive->words088_255+170-88), sizeof(add)-1);
+-    if (add[0])
+-      pout("Add. Product Id:  %s\n", add);
++    if (add[0]) {
++      jout("Add. Product Id:  %s\n", add);
++      jglb["ata_additional_product_id"] = add;
++    }
+   }
+ 
+-  pout("Firmware Version: %s\n", infofound(firmware));
++  jout("Firmware Version: %s\n", infofound(firmware));
++  jglb["firmware_version"] = firmware;
+ 
+   if (sizes.capacity) {
+     // Print capacity
+     char num[64], cap[32];
+-    pout("User Capacity:    %s bytes [%s]\n",
++    jout("User Capacity:    %s bytes [%s]\n",
+       format_with_thousands_sep(num, sizeof(num), sizes.capacity),
+       format_capacity(cap, sizeof(cap), sizes.capacity));
++    jglb["user_capacity"] = sizes.capacity;
+ 
+     // Print sector sizes.
+     if (sizes.phy_sector_size == sizes.log_sector_size)
+-      pout("Sector Size:      %u bytes logical/physical\n", sizes.log_sector_size);
++      jout("Sector Size:      %u bytes logical/physical\n", sizes.log_sector_size);
+     else {
+-      pout("Sector Sizes:     %u bytes logical, %u bytes physical",
+-         sizes.log_sector_size, sizes.phy_sector_size);
++      jout("Sector Sizes:     %u bytes logical, %u bytes physical",
++        sizes.log_sector_size, sizes.phy_sector_size);
+       if (sizes.log_sector_offset)
+         pout(" (offset %u bytes)", sizes.log_sector_offset);
+-      pout("\n");
++      jout("\n");
+     }
++    jglb["logical_block_size"]  = sizes.log_sector_size;
++    jglb["physical_block_size"] = sizes.phy_sector_size;
+   }
+ 
+   // Print nominal media rotation rate if reported
+   if (rpm) {
+     if (rpm == 1)
+-      pout("Rotation Rate:    Solid State Device\n");
++      jout("Rotation Rate:    Solid State Device\n");
+     else if (rpm > 1)
+-      pout("Rotation Rate:    %d rpm\n", rpm);
++      jout("Rotation Rate:    %d rpm\n", rpm);
+     else
+       pout("Rotation Rate:    Unknown (0x%04x)\n", -rpm);
++    if (rpm > 0)
++      jglb["rotation_rate"] = (rpm == 1 ? 0 : rpm);
+   }
+ 
+   // Print form factor if reported
+@@ -667,15 +683,18 @@ static void print_drive_info(const ata_identify_device * drive,
+   if (word168) {
+     const char * form_factor = get_form_factor(word168);
+     if (form_factor)
+-      pout("Form Factor:      %s\n", form_factor);
++      jout("Form Factor:      %s\n", form_factor);
+     else
+-      pout("Form Factor:      Unknown (0x%04x)\n", word168);
++      jout("Form Factor:      Unknown (0x%04x)\n", word168);
++    jglb["form_factor"]["ata_value"] = word168;
++    jglb["form_factor"]["name"] = form_factor;
+   }
+ 
+   // See if drive is recognized
+-  pout("Device is:        %s\n", !dbentry ?
++  jout("Device is:        %s\n", !dbentry ?
+        "Not in smartctl database [for details use: -P showall]":
+        "In smartctl database [for details use: -P show]");
++  jglb["in_smartctl_database"] = !!dbentry;
+ 
+   // Print ATA version
+   std::string ataver;
+@@ -702,7 +721,12 @@ static void print_drive_info(const ata_identify_device * drive,
+         ataver += " (minor revision not indicated)";
+     }
+   }
+-  pout("ATA Version is:   %s\n", infofound(ataver.c_str()));
++  jout("ATA Version is:   %s\n", infofound(ataver.c_str()));
++  if (!ataver.empty()) {
++    jglb["ata_version"]["string"] = ataver;
++    jglb["ata_version"]["major_value"] = drive->major_rev_num;
++    jglb["ata_version"]["minor_value"] = drive->minor_rev_num;
++  }
+ 
+   // Print Transport specific version
+   unsigned short word222 = drive->words088_255[222-88];
+@@ -718,10 +742,17 @@ static void print_drive_info(const ata_identify_device * drive,
+         const char * sataver = get_sata_version(word222);
+         const char * maxspeed = get_sata_maxspeed(drive);
+         const char * curspeed = get_sata_curspeed(drive);
+-        pout("SATA Version is:  %s%s%s%s%s%s\n", sataver,
++        jout("SATA Version is:  %s%s%s%s%s%s\n", sataver,
+              (maxspeed ? ", " : ""), (maxspeed ? maxspeed : ""),
+              (curspeed ? " (current: " : ""), (curspeed ? curspeed : ""),
+              (curspeed ? ")" : ""));
++        if (sataver)
++          jglb["sata_version"]["string"] = sataver;
++        jglb["sata_version"]["value"] = word222 & 0x0fff;
++        if (maxspeed)
++          jglb["interface_speed"]["max"]["string"] = maxspeed;
++        if (curspeed)
++          jglb["interface_speed"]["current"]["string"] = curspeed;
+       }
+       break;
+     case 0xe: // PCIe (ACS-4)
+@@ -733,8 +764,11 @@ static void print_drive_info(const ata_identify_device * drive,
+   }
+ 
+   // print current time and date and timezone
+-  char timedatetz[DATEANDEPOCHLEN]; dateandtimezone(timedatetz);
+-  pout("Local Time is:    %s\n", timedatetz);
++  time_t now = time(0);
++  char timedatetz[DATEANDEPOCHLEN]; dateandtimezoneepoch(timedatetz, now);
++  jout("Local Time is:    %s\n", timedatetz);
++  jglb["local_time"]["time_t"] = now;
++  jglb["local_time"]["asctime"] = timedatetz;
+ 
+   // Print warning message, if there is one
+   if (dbentry && *dbentry->warningmsg)
+@@ -1026,7 +1060,7 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+   bool needheader = true;
+ 
+   // step through all vendor attributes
+-  for (int i = 0; i < NUMBER_ATA_SMART_ATTRIBUTES; i++) {
++  for (int i = 0, ji = 0; i < NUMBER_ATA_SMART_ATTRIBUTES; i++) {
+     const ata_smart_attribute & attr = data->vendor_attributes[i];
+ 
+     // Check attribute and threshold
+@@ -1045,14 +1079,15 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+     // print header only if needed
+     if (needheader) {
+       if (!onlyfailed) {
+-        pout("SMART Attributes Data Structure revision number: %d\n",(int)data->revnumber);
+-        pout("Vendor Specific SMART Attributes with Thresholds:\n");
++        jout("SMART Attributes Data Structure revision number: %d\n",(int)data->revnumber);
++        jglb["ata_smart_attributes"]["revision"] = data->revnumber;
++        jout("Vendor Specific SMART Attributes with Thresholds:\n");
+       }
+       if (!brief)
+-        pout("ID#%s ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE\n",
++        jout("ID#%s ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE\n",
+              (!hexid ? "" : " "));
+       else
+-        pout("ID#%s ATTRIBUTE_NAME          FLAGS    VALUE WORST THRESH FAIL RAW_VALUE\n",
++        jout("ID#%s ATTRIBUTE_NAME          FLAGS    VALUE WORST THRESH FAIL RAW_VALUE\n",
+              (!hexid ? "" : " "));
+       needheader = false;
+     }
+@@ -1082,7 +1117,7 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+     std::string rawstr = ata_format_attr_raw_value(attr, defs);
+ 
+     if (!brief)
+-      pout("%s %-24s0x%04x   %-4s  %-4s  %-4s   %-10s%-9s%-12s%s\n",
++      jout("%s %-24s0x%04x   %-4s  %-4s  %-4s   %-10s%-9s%-12s%s\n",
+            idstr.c_str(), attrname.c_str(), attr.flags,
+            valstr.c_str(), worstr.c_str(), threstr.c_str(),
+            (ATTRIBUTE_FLAGS_PREFAILURE(attr.flags) ? "Pre-fail" : "Old_age"),
+@@ -1092,7 +1127,7 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+                                            : "    -"        ) ,
+             rawstr.c_str());
+     else
+-      pout("%s %-24s%c%c%c%c%c%c%c  %-4s  %-4s  %-4s   %-5s%s\n",
++      jout("%s %-24s%c%c%c%c%c%c%c  %-4s  %-4s  %-4s   %-5s%s\n",
+            idstr.c_str(), attrname.c_str(),
+            (ATTRIBUTE_FLAGS_PREFAILURE(attr.flags)     ? 'P' : '-'),
+            (ATTRIBUTE_FLAGS_ONLINE(attr.flags)         ? 'O' : '-'),
+@@ -1107,12 +1142,42 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+                                            : "-"     ),
+             rawstr.c_str());
+ 
++    if (!jglb.is_enabled())
++      continue;
++
++    json::ref jref = jglb["ata_smart_attributes"]["attrs"][ji++];
++    jref["id"] = attr.id;
++    jref["name"] = attrname;
++    if (state > ATTRSTATE_NO_NORMVAL)
++      jref["value"] = attr.current;
++    if (!(defs[attr.id].flags & ATTRFLAG_NO_WORSTVAL))
++      jref["worst"] = attr.worst;
++    if (state > ATTRSTATE_NO_THRESHOLD) {
++      jref["thresh"] = threshold;
++      jref["when_failed"] = (state == ATTRSTATE_FAILED_NOW  ? "now" :
++                           state == ATTRSTATE_FAILED_PAST ? "past"
++                                                          : ""     );
++    }
++    jref["flags"]["value"] = attr.flags;
++    {
++      static const char * const fnames[6] =
++        { "P", "O", "S", "R", "C", "K" };
++      int ai = 0;
++      for (int bi = 0; bi < 6; bi++) {
++        if (attr.flags & (1 << bi))
++          jref["flags"]["set"][ai++] = fnames[bi];
++      }
++      if (ATTRIBUTE_FLAGS_OTHER(attr.flags))
++        jref["flags"]["set"][ai] = "+";
++    }
++    jref["raw"]["value"] = ata_get_attr_raw_value(attr, defs);
++    jref["raw"]["string"] = rawstr;
+   }
+ 
+   if (!needheader) {
+     if (!onlyfailed && brief) {
+         int n = (!hexid ? 28 : 29);
+-        pout("%*s||||||_ K auto-keep\n"
++        jout("%*s||||||_ K auto-keep\n"
+              "%*s|||||__ C event count\n"
+              "%*s||||___ R error rate\n"
+              "%*s|||____ S speed/performance\n"
+@@ -1122,6 +1187,14 @@ static void PrintSmartAttribWithThres(const ata_smart_values * data,
+     }
+     pout("\n");
+   }
++
++  if (!jglb.is_enabled())
++    return;
++
++  // Protocol independent temperature
++  unsigned char t = ata_return_temperature_value(data, defs);
++  if (t)
++    jglb["temperature"]["current"] = t;
+ }
+ 
+ // Print SMART related SCT capabilities
+@@ -1855,11 +1928,14 @@ static const char * get_error_log_state_desc(unsigned state)
+ static int PrintSmartErrorlog(const ata_smart_errorlog *data,
+                               firmwarebug_defs firmwarebugs)
+ {
+-  pout("SMART Error Log Version: %d\n", (int)data->revnumber);
+-  
++  json::ref jref = jglb["ata_smart_error_log"]["summary"];
++  jout("SMART Error Log Version: %d\n", (int)data->revnumber);
++  jref["revision"] = data->revnumber;
++
+   // if no errors logged, return
+   if (!data->error_log_pointer){
+-    pout("No Errors Logged\n\n");
++    jout("No Errors Logged\n\n");
++    jref["count"] = 0;
+     return 0;
+   }
+   print_on();
+@@ -1879,10 +1955,11 @@ static int PrintSmartErrorlog(const ata_smart_errorlog *data,
+   
+   // starting printing error log info
+   if (data->ata_error_count<=5)
+-    pout( "ATA Error Count: %d\n", (int)data->ata_error_count);
++    jout( "ATA Error Count: %d\n", (int)data->ata_error_count);
+   else
+     pout( "ATA Error Count: %d (device log contains only the most recent five errors)\n",
+            (int)data->ata_error_count);
++  jglb["count"] = data->ata_error_count;
+   print_off();
+   pout("\tCR = Command Register [HEX]\n"
+        "\tFR = Features Register [HEX]\n"
+@@ -1972,11 +2049,15 @@ static int PrintSmartExtErrorLog(ata_device * device,
+                                  const ata_smart_exterrlog * log,
+                                  unsigned nsectors, unsigned max_errors)
+ {
+-  pout("SMART Extended Comprehensive Error Log Version: %u (%u sectors)\n",
++  json::ref jref = jglb["ata_smart_error_log"]["extended"];
++  jout("SMART Extended Comprehensive Error Log Version: %u (%u sectors)\n",
+        log->version, nsectors);
++  jref["revision"] = log->version;
++  jref["sectors"] = nsectors;
+ 
+   if (!log->device_error_count) {
+-    pout("No Errors Logged\n\n");
++    jout("No Errors Logged\n\n");
++    jref["count"] = 0;
+     return 0;
+   }
+   print_on();
+@@ -2004,12 +2085,13 @@ static int PrintSmartExtErrorLog(ata_device * device,
+   unsigned errcnt = log->device_error_count;
+ 
+   if (errcnt <= nentries)
+-    pout("Device Error Count: %u\n", log->device_error_count);
++    jout("Device Error Count: %u\n", log->device_error_count);
+   else {
+     errcnt = nentries;
+     pout("Device Error Count: %u (device log contains only the most recent %u errors)\n",
+          log->device_error_count, errcnt);
+   }
++  jref["count"] = errcnt;
+ 
+   if (max_errors < errcnt)
+     errcnt = max_errors;
+@@ -2376,6 +2458,7 @@ static const char * sct_device_state_msg(unsigned char state)
+ // Print SCT Status
+ static int ataPrintSCTStatus(const ata_sct_status_response * sts)
+ {
++  json::ref jref = jglb["ata_sct_status"];
+   pout("SCT Status Version:                  %u\n", sts->format_version);
+   pout("SCT Version (vendor specific):       %u (0x%04x)\n", sts->sct_version, sts->sct_version);
+   pout("SCT Support Level:                   %u\n", sts->sct_spec);
+@@ -2401,8 +2484,13 @@ static int ataPrintSCTStatus(const ata_sct_status_response * sts)
+     // Table 80 of T13/1699-D (ATA8-ACS) Revision 6a, September 2008 (format version 3)
+     // Table 185 of T13/BSR INCITS 529 (ACS-4) Revision 16, February 21, 2017
+     // (smart_status, min_erc_time)
+-    pout("Current Temperature:                    %s Celsius\n",
++    jout("Current Temperature:                    %s Celsius\n",
+       sct_ptemp(sts->hda_temp, buf1));
++    if (sts->hda_temp != -128) {
++      jref["temperature"]["current"] = sts->hda_temp;
++      // Protocol independent value
++      jglb["temperature"]["current"] = sts->hda_temp;
++    }
+     pout("Power Cycle Min/Max Temperature:     %s/%s Celsius\n",
+       sct_ptemp(sts->min_temp, buf1), sct_ptemp(sts->max_temp, buf2));
+     pout("Lifetime    Min/Max Temperature:     %s/%s Celsius\n",
+@@ -2620,6 +2708,8 @@ static void print_standby_timer(const char * msg, int timer, const ata_identify_
+ 
+ int ataPrintMain (ata_device * device, const ata_print_options & options)
+ {
++  jglb["protocol"] = "ata";
++
+   // If requested, check power mode first
+   const char * powername = 0;
+   bool powerchg = false;
+@@ -2662,7 +2752,7 @@ int ataPrintMain (ata_device * device, const ata_print_options & options)
+     }
+     if (powername) {
+       if (options.powermode >= powerlimit) {
+-        pout("Device is in %s mode, exit(%d)\n", powername, options.powerexit);
++        jinf("Device is in %s mode, exit(%d)\n", powername, options.powerexit);
+         return options.powerexit;
+       }
+       powerchg = (powermode != 0xff); // SMART tests will spin up drives
+@@ -3238,7 +3328,8 @@ int ataPrintMain (ata_device * device, const ata_print_options & options)
+ 
+     case 0:
+       // The case where the disk health is OK
+-      pout("SMART overall-health self-assessment test result: PASSED\n");
++      jout("SMART overall-health self-assessment test result: PASSED\n");
++      jglb["smart_status"]["passed"] = true;
+       if (smart_thres_ok && find_failed_attr(&smartval, &smartthres, attribute_defs, 0)) {
+         if (options.smart_vendor_attrib)
+           pout("See vendor-specific Attribute list for marginal Attributes.\n\n");
+@@ -3256,8 +3347,9 @@ int ataPrintMain (ata_device * device, const ata_print_options & options)
+     case 1:
+       // The case where the disk health is NOT OK
+       print_on();
+-      pout("SMART overall-health self-assessment test result: FAILED!\n"
++      jout("SMART overall-health self-assessment test result: FAILED!\n"
+            "Drive failure expected in less than 24 hours. SAVE ALL DATA.\n");
++      jglb["smart_status"]["passed"] = false;
+       print_off();
+       if (smart_thres_ok && find_failed_attr(&smartval, &smartthres, attribute_defs, 1)) {
+         returnval|=FAILATTR;
+@@ -3293,9 +3385,10 @@ int ataPrintMain (ata_device * device, const ata_print_options & options)
+       }
+       else if (find_failed_attr(&smartval, &smartthres, attribute_defs, 1)) {
+         print_on();
+-        pout("SMART overall-health self-assessment test result: FAILED!\n"
++        jout("SMART overall-health self-assessment test result: FAILED!\n"
+              "Drive failure expected in less than 24 hours. SAVE ALL DATA.\n");
+-        pout("Warning: This result is based on an Attribute check.\n");
++        jwrn("Warning: This result is based on an Attribute check.\n");
++        jglb["smart_status"]["passed"] = false;
+         print_off();
+         returnval|=FAILATTR;
+         returnval|=FAILSTATUS;
+@@ -3308,8 +3401,9 @@ int ataPrintMain (ata_device * device, const ata_print_options & options)
+         }
+       }
+       else {
+-        pout("SMART overall-health self-assessment test result: PASSED\n");
+-        pout("Warning: This result is based on an Attribute check.\n");
++        jout("SMART overall-health self-assessment test result: PASSED\n");
++        jwrn("Warning: This result is based on an Attribute check.\n");
++        jglb["smart_status"]["passed"] = true;
+         if (find_failed_attr(&smartval, &smartthres, attribute_defs, 0)) {
+           if (options.smart_vendor_attrib)
+             pout("See vendor-specific Attribute list for marginal Attributes.\n\n");
+diff --git a/json.cpp b/json.cpp
+new file mode 100644
+index 0000000..982e1e7
+--- /dev/null
++++ b/json.cpp
+@@ -0,0 +1,274 @@
++/*
++ * json.cpp
++ *
++ * Home page of code is: https://www.smartmontools.org
++ *
++ * Copyright (C) 2017 Christian Franke
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2, or (at your option)
++ * any later version.
++ *
++ * You should have received a copy of the GNU General Public License
++ * (for example COPYING); If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#include "config.h"
++#include "json.h"
++
++const char * json_cvsid = "$Id$"
++  JSON_H_CVSID;
++
++#include <stdexcept>
++
++static void jassert_failed(int line, const char * expr)
++{
++  char msg[128];
++  // Avoid __FILE__ as it may break reproducible builds
++  snprintf(msg, sizeof(msg), "json.cpp(%d): Assertion failed: %s", line, expr);
++  throw std::logic_error(msg);
++}
++
++#define jassert(expr) (!(expr) ? jassert_failed(__LINE__, #expr) : (void)0)
++
++static void check_key(const char * key)
++{
++  // Limit: object keys should be valid identifiers (lowercase only)
++  char c = key[0];
++  jassert('a' <= c && c <= 'z');
++  for (int i = 1; (c = key[i]); i++)
++    jassert(('a' <= c && c <= 'z') || ('0' <= c && c <= '9') || (c == '_'));
++}
++
++json::ref::ref(json & js, const char * key)
++: m_js(js)
++{
++  check_key(key);
++  m_path.push_back(node_info(key));
++}
++
++json::ref::ref(const ref & base, const char * key)
++: m_js(base.m_js), m_path(base.m_path)
++{
++  check_key(key);
++  m_path.push_back(node_info(key));
++}
++
++json::ref::ref(const ref & base, int index)
++: m_js(base.m_js), m_path(base.m_path)
++{
++  jassert(0 <= index && index < 10000); // Limit: large arrays not supported
++  m_path.push_back(node_info(index));
++}
++
++json::ref & json::ref::operator=(bool value)
++{
++  m_js.set_bool(m_path, value);
++  return *this;
++}
++
++json::ref & json::ref::operator=(long long value)
++{
++  m_js.set_int(m_path, value);
++  return *this;
++}
++
++json::ref & json::ref::operator=(int value)
++{
++  return operator=((long long)value);
++}
++
++json::ref & json::ref::operator=(unsigned value)
++{
++  return operator=((long long)value);
++}
++
++json::ref & json::ref::operator=(long value)
++{
++  return operator=((long long)value);
++}
++
++json::ref & json::ref::operator=(unsigned long value)
++{
++  return operator=((long long)value);
++}
++
++json::ref & json::ref::operator=(unsigned long long value)
++{
++  return operator=((long long)value);
++}
++
++json::ref & json::ref::operator=(const std::string & value)
++{
++  m_js.set_string(m_path, value);
++  return *this;
++}
++
++json::ref & json::ref::operator=(const char * value)
++{
++  jassert(value); // Limit: null not supported
++  return operator=(std::string(value));
++}
++
++json::node::~node()
++{
++  for (size_t i = 0; i < childs.size(); i++)
++    delete childs[i];
++}
++
++json::node * json::find_or_create_node(const json::node_path & path, node_type type)
++{
++  node * p = &m_root_node;
++  for (unsigned i = 0; i < path.size(); i++) {
++    const node_info & pi = path[i];
++    if (!pi.key.empty()) {
++      // Object
++      if (p->type == nt_unset)
++        p->type = nt_object;
++      else
++        jassert(p->type == nt_object); // Limit: type change not supported
++      // Existing or new object element?
++      node::keymap::iterator ni = p->key2index.find(pi.key);
++      node * p2;
++      if (ni != p->key2index.end()) {
++        // Object element exists
++        p2 = p->childs[ni->second];
++      }
++      else {
++        // Create new object element
++        p->key2index[pi.key] = (unsigned)p->childs.size();
++        p2 = new node(pi.key);
++        p->childs.push_back(p2);
++      }
++      jassert(p2 && p2->key == pi.key);
++      p = p2;
++    }
++
++    else {
++      // Array
++      if (p->type == nt_unset)
++        p->type = nt_array;
++      else
++        jassert(p->type == nt_array); // Limit: type change not supported
++      node * p2;
++      // Existing or new array element?
++      if (pi.index < (int)p->childs.size()) {
++        // Array index exists
++        p2 = p->childs[pi.index];
++        if (!p2) // Already created ?
++          p->childs[pi.index] = p2 = new node;
++      }
++      else {
++        // Grow array, fill gap, create new element
++        p->childs.resize(pi.index + 1);
++        p->childs[pi.index] = p2 = new node;
++      }
++      jassert(p2 && p2->key.empty());
++      p = p2;
++    }
++  }
++
++  if (p->type == nt_unset)
++    p->type = type;
++  else
++    jassert(p->type == type); // Limit: type change not supported
++  return p;
++}
++
++json::json()
++: m_enabled(false)
++{
++}
++
++void json::set_bool(const node_path & path, bool value)
++{
++  if (!m_enabled)
++    return;
++  find_or_create_node(path, nt_bool)->intval = (value ? 1 : 0);
++}
++
++void json::set_int(const node_path & path, long long value)
++{
++  if (!m_enabled)
++    return;
++  find_or_create_node(path, nt_int)->intval = value;
++}
++
++void json::set_string(const node_path & path, const std::string & value)
++{
++  if (!m_enabled)
++    return;
++  find_or_create_node(path, nt_string)->strval = value;
++}
++
++static void print_string(FILE * f, const char * s)
++{
++  putc('"', f);
++  for (int i = 0; s[i]; i++) {
++    char c = s[i];
++    if (c == '"' || c == '\\')
++      putc('\\', f);
++    else if (c == '\t') {
++      putc('\\', f); c = 't';
++    }
++    else if (!(' ' <= c && c <= '~'))
++      c = '?'; // TODO: UTF-8 characters?
++    putc(c, f);
++  }
++  putc('"', f);
++}
++
++void json::print_worker(FILE * f, const node * p, int level) const
++{
++  if (!p->key.empty())
++    fprintf(f, "\"%s\" : ", p->key.c_str());
++
++  switch (p->type) {
++    case nt_object:
++    case nt_array:
++      putc((p->type == nt_object ? '{' : '['), f);
++      if (!p->childs.empty()) {
++        for (unsigned i = 0; i < p->childs.size(); i++) {
++          fprintf(f, "%s\n%*s", (i > 0 ? "," : ""), (level + 1) * 2, "");
++          node * p2 = p->childs[i];
++          if (!p2) {
++            // Unset element of sparse array
++            jassert(p->type == nt_array);
++            fputs("null", f);
++          }
++          else {
++            // Recurse
++            print_worker(f, p2, level + 1);
++          }
++        }
++        fprintf(f, "\n%*s", level * 2, "");
++      }
++      putc((p->type == nt_object ? '}' : ']'), f);
++      break;
++
++    case nt_bool:
++      fputs((p->intval ? "true" : "false"), f);
++      break;
++
++    case nt_int:
++      fprintf(f, "%lld", p->intval);
++      break;
++
++    case nt_string:
++      print_string(f, p->strval.c_str());
++      break;
++
++    default: jassert(false);
++  }
++}
++
++void json::print(FILE * f) const
++{
++  if (m_root_node.type == nt_unset)
++    return;
++  jassert(m_root_node.type == nt_object);
++  print_worker(f, &m_root_node, 0);
++  putc('\n', f);
++}
+diff --git a/json.h b/json.h
+new file mode 100644
+index 0000000..750d9e5
+--- /dev/null
++++ b/json.h
+@@ -0,0 +1,138 @@
++/*
++ * json.h
++ *
++ * Home page of code is: https://www.smartmontools.org
++ *
++ * Copyright (C) 2017 Christian Franke
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2, or (at your option)
++ * any later version.
++ *
++ * You should have received a copy of the GNU General Public License
++ * (for example COPYING); If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#ifndef JSON_H_CVSID
++#define JSON_H_CVSID "$Id$"
++
++#include <stdio.h>
++#include <vector>
++#include <map>
++
++/// Create and print JSON output.
++class json
++{
++private:
++  struct node_info
++  {
++    std::string key;
++    int index;
++
++    node_info()
++      : index(0) { }
++    explicit node_info(const char * key_)
++      : key(key_), index(0) { }
++    explicit node_info(int index_)
++      : index(index_) { }
++  };
++
++  typedef std::vector<node_info> node_path;
++
++public:
++  json();
++
++  /// Reference to a JSON element.
++  class ref
++  {
++  public:
++    /// Return reference to object element.
++    ref operator[](const char * key) const
++      { return ref(*this, key); };
++
++    /// Return reference to array element.
++    ref operator[](int index) const
++      { return ref(*this, index); };
++
++    // Assignment operators create or change element.
++    ref & operator=(bool value);
++
++    ref & operator=(int value);
++    ref & operator=(unsigned value);
++    ref & operator=(long value);
++    ref & operator=(unsigned long value);
++    ref & operator=(long long  value);
++    ref & operator=(unsigned long long value);
++
++    ref & operator=(const char * value);
++    ref & operator=(const std::string & value);
++
++  private:
++    friend class json;
++    ref(json & js, const char * key);
++    ref(const ref & base, const char * key);
++    ref(const ref & base, int index);
++
++    json & m_js;
++    node_path m_path;
++  };
++
++  /// Return reference to element of top level object.
++  ref operator[](const char * key)
++    { return ref(*this, key); };
++
++  /// Enable/disable JSON output.
++  void enable(bool yes = true)
++    { m_enabled = yes; }
++
++  /// Return true if enabled.
++  bool is_enabled() const
++    { return m_enabled; }
++
++  /// Print JSON tree to a file.
++  void print(FILE * f) const;
++
++private:
++  enum node_type { nt_unset, nt_object, nt_array, nt_bool, nt_int, nt_string };
++
++  struct node
++  {
++    node()
++      : type(nt_unset), intval(0) { }
++    explicit node(const std::string & key_)
++      : type(nt_unset), intval(0), key(key_) { }
++    ~node();
++
++    node_type type;
++
++    long long intval;
++    std::string strval;
++
++    std::string key;
++    std::vector<node *> childs;
++    typedef std::map<std::string, unsigned> keymap;
++    keymap key2index;
++
++#if __cplusplus >= 201103
++    node(const node &) = delete;
++    void operator=(const node &) = delete;
++#else
++    private: node(const node &); void operator=(const node &);
++#endif
++  };
++
++  bool m_enabled;
++  node m_root_node;
++
++  node * find_or_create_node(const node_path & path, node_type type);
++
++  void set_bool(const node_path & path, bool value);
++  void set_int(const node_path & path, long long value);
++  void set_string(const node_path & path, const std::string & value);
++
++  void print_worker(FILE * f, const node * p, int level) const;
++};
++
++#endif // JSON_H_CVSID
+diff --git a/scsiprint.cpp b/scsiprint.cpp
+index 9416f23..50d39d3 100644
+--- a/scsiprint.cpp
++++ b/scsiprint.cpp
+@@ -173,16 +173,25 @@ scsiGetSmartData(scsi_device * device, bool attribs)
+     if (cp) {
+         err = -2;
+         print_on();
+-        pout("SMART Health Status: %s [asc=%x, ascq=%x]\n", cp, asc, ascq);
++        jout("SMART Health Status: %s [asc=%x, ascq=%x]\n", cp, asc, ascq);
+         print_off();
+-    } else if (gIecMPage)
+-        pout("SMART Health Status: OK\n");
++        jglb["smart_status"]["passed"] = false;
++        jglb["smart_status"]["scsi"]["asc"] = asc;
++        jglb["smart_status"]["scsi"]["ascq"] = ascq;
++        jglb["smart_status"]["scsi"]["ie_string"] = cp;
++    }
++    else if (gIecMPage) {
++        jout("SMART Health Status: OK\n");
++        jglb["smart_status"]["passed"] = true;
++    }
+ 
+     if (attribs && !gTempLPage) {
+         if (255 == currenttemp)
+             pout("Current Drive Temperature:     <not available>\n");
+-        else
+-            pout("Current Drive Temperature:     %d C\n", currenttemp);
++        else {
++            jout("Current Drive Temperature:     %d C\n", currenttemp);
++            jglb["temperature"]["current"] = currenttemp;
++        }
+         if (255 == triptemp)
+             pout("Drive Trip Temperature:        <not available>\n");
+         else
+@@ -1458,7 +1467,6 @@ static const char * transport_proto_arr[] = {
+ static int
+ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+ {
+-    char timedatetz[DATEANDEPOCHLEN];
+     struct scsi_iec_mode_page iec;
+     int err, iec_err, len, req_len, avail_len, scsi_version;
+     bool is_tape = false;
+@@ -1510,10 +1518,16 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+         scsi_format_id_string(revision, (const unsigned char *)&gBuf[32], 4);
+ 
+         pout("=== START OF INFORMATION SECTION ===\n");
+-        pout("Vendor:               %.8s\n", vendor);
+-        pout("Product:              %.16s\n", product);
+-        if (gBuf[32] >= ' ')
+-            pout("Revision:             %.4s\n", revision);
++        jout("Vendor:               %.8s\n", vendor);
++        jglb["vendor"] = vendor;
++        jout("Product:              %.16s\n", product);
++        jglb["product"] = product;
++        jglb["model_name"] = strprintf("%s%s%s",
++          vendor, (*vendor && *product ? " " : ""), product);
++        if (gBuf[32] >= ' ') {
++            jout("Revision:             %.4s\n", revision);
++            jglb["firmware_version"] = revision;
++        }
+         if (scsi_version == 0x6)
+             pout("Compliance:           SPC-4\n");
+         else if (scsi_version == 0x7)
+@@ -1534,7 +1548,6 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+     if (! is_tape) {    /* assume disk if not tape drive (or tape changer) */
+         unsigned int lb_size = 0;
+         unsigned char lb_prov_resp[8];
+-        char lb_str[16];
+         int lb_per_pb_exp = 0;
+         uint64_t capacity = scsiGetSize(device, &lb_size, &lb_per_pb_exp);
+ 
+@@ -1542,9 +1555,10 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+             char cap_str[64], si_str[64];
+             format_with_thousands_sep(cap_str, sizeof(cap_str), capacity);
+             format_capacity(si_str, sizeof(si_str), capacity);
+-            pout("User Capacity:        %s bytes [%s]\n", cap_str, si_str);
+-            snprintf(lb_str, sizeof(lb_str) - 1, "%u", lb_size);
+-            pout("Logical block size:   %s bytes\n", lb_str);
++            jout("User Capacity:        %s bytes [%s]\n", cap_str, si_str);
++            jglb["user_capacity"] = capacity;
++            jout("Logical block size:   %u bytes\n", lb_size);
++            jglb["logical_block_size"] = lb_size;
+         }
+         int lbpme = -1;
+         int lbprz = -1;
+@@ -1554,9 +1568,9 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+             if (0 == scsiGetProtPBInfo(device, rc16_12)) {
+                 lb_per_pb_exp = rc16_12[1] & 0xf;       /* just in case */
+                 if (lb_per_pb_exp > 0) {
+-                    snprintf(lb_str, sizeof(lb_str) - 1, "%u",
+-                             (lb_size * (1 << lb_per_pb_exp)));
+-                    pout("Physical block size:  %s bytes\n", lb_str);
++                    unsigned pb_size = lb_size * (1 << lb_per_pb_exp);
++                    jout("Physical block size:  %u bytes\n", pb_size);
++                    jglb["physical_block_size"] = pb_size;
+                     int n = ((rc16_12[2] & 0x3f) << 8) + rc16_12[3];
+                     if (n > 0)  // not common so cut the clutter
+                         pout("Lowest aligned LBA:   %d\n", n);
+@@ -1638,11 +1652,12 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+             if (0 == rpm)
+                 ;       // Not reported
+             else if (1 == rpm)
+-                pout("Rotation Rate:        Solid State Device\n");
++                jout("Rotation Rate:        Solid State Device\n");
+             else if ((rpm <= 0x400) || (0xffff == rpm))
+                 ;       // Reserved
+             else
+-                pout("Rotation Rate:        %d rpm\n", rpm);
++                jout("Rotation Rate:        %d rpm\n", rpm);
++            jglb["rotation_rate"] = (rpm == 1 ? 0 : rpm);
+         }
+         if (form_factor > 0) {
+             const char * cp = NULL;
+@@ -1664,8 +1679,11 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+                 cp = "< 1.8";
+                 break;
+             }
+-            if (cp)
+-                pout("Form Factor:          %s inches\n", cp);
++            jglb["form_factor"]["scsi_value"] = form_factor;
++            if (cp) {
++                jout("Form Factor:          %s inches\n", cp);
++                jglb["form_factor"]["name"] = strprintf("%s inches", cp);
++            }
+         }
+         if (haw_zbc > 0)
+             pout("Host aware zoned block capable\n");
+@@ -1708,7 +1726,8 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+ 
+             gBuf[4 + len] = '\0';
+             scsi_format_id_string(serial, &gBuf[4], len);
+-            pout("Serial number:        %s\n", serial);
++            jout("Serial number:        %s\n", serial);
++            jglb["serial_number"] = serial;
+         } else if (scsi_debugmode > 0) {
+             print_on();
+             if (SIMPLE_ERR_BAD_RESP == err)
+@@ -1720,11 +1739,14 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+     }
+ 
+     // print SCSI peripheral device type
++    jglb["device_type"]["scsi_value"] = peri_dt;
+     if (peri_dt < (int)(sizeof(peripheral_dt_arr) /
+-                        sizeof(peripheral_dt_arr[0])))
+-        pout("Device type:          %s\n", peripheral_dt_arr[peri_dt]);
++                        sizeof(peripheral_dt_arr[0]))) {
++        jout("Device type:          %s\n", peripheral_dt_arr[peri_dt]);
++        jglb["device_type"]["name"] = peripheral_dt_arr[peri_dt];
++    }
+     else
+-        pout("Device type:          <%d>\n", peri_dt);
++        jout("Device type:          <%d>\n", peri_dt);
+ 
+     // See if transport protocol is known
+     if (transport < 0)
+@@ -1733,8 +1755,11 @@ scsiGetDriveInfo(scsi_device * device, UINT8 * peripheral_type, bool all)
+         pout("Transport protocol:   %s\n", transport_proto_arr[transport]);
+ 
+     // print current time and date and timezone
+-    dateandtimezone(timedatetz);
+-    pout("Local Time is:        %s\n", timedatetz);
++    time_t now = time(0);
++    char timedatetz[DATEANDEPOCHLEN]; dateandtimezoneepoch(timedatetz, now);
++    jout("Local Time is:        %s\n", timedatetz);
++    jglb["local_time"]["time_t"] = now;
++    jglb["local_time"]["asctime"] = timedatetz;
+ 
+     // See if unit accepts SCSI commmands from us
+     if ((err = scsiTestUnitReady(device))) {
+@@ -1875,8 +1900,10 @@ scsiPrintTemp(scsi_device * device)
+ 
+     if (255 == temp)
+         pout("Current Drive Temperature:     <not available>\n");
+-    else
+-        pout("Current Drive Temperature:     %d C\n", temp);
++    else {
++        jout("Current Drive Temperature:     %d C\n", temp);
++        jglb["temperature"]["current"] = temp;
++    }
+     if (255 == trip)
+         pout("Drive Trip Temperature:        <not available>\n");
+     else
+@@ -1888,6 +1915,8 @@ scsiPrintTemp(scsi_device * device)
+ int
+ scsiPrintMain(scsi_device * device, const scsi_print_options & options)
+ {
++    jglb["protocol"] = "scsi";
++
+     int checkedSupportedLogPages = 0;
+     UINT8 peripheral_type = 0;
+     int returnval = 0;
+diff --git a/smartctl.8.in b/smartctl.8.in
+index b6cd294..18c86a6 100644
+--- a/smartctl.8.in
++++ b/smartctl.8.in
+@@ -315,6 +315,25 @@ info.
+ .TP
+ .B RUN-TIME BEHAVIOR OPTIONS:
+ .TP
++.B \-j, \-\-json[=aiu]
++[NEW EXPERIMENTAL SMARTCTL FEATURE]
++Enables JSON output mode.
++The output could be enhanced by the optional argument which consists of one
++or more characters from the set \*(Aqaiu\*(Aq:
++.br
++\*(Aqa\*(Aq: Includes the full original plaintext output of \fBsmartctl\fR as
++a JSON \fBa\fRrray \*(Aqsmartctl.output[]\*(Aq.
++.Sp
++The following two arguments are primarily indented for development:
++.br
++\*(Aqi\*(Aq: Includes lines from the plaintext output which print info already
++\fBi\fRmplemented for JSON output.
++The lines appear as objects with key \*(Aqsmartctl_NNNN_i\*(Aq.
++.br
++\*(Aqu\*(Aq: Includes lines from the plaintext output which print info still
++\fBu\fRnimplemented for JSON output.
++The lines appear as objects with key \*(Aqsmartctl_NNNN_u\*(Aq.
++.TP
+ .B \-q TYPE, \-\-quietmode=TYPE
+ Specifies that \fBsmartctl\fP should run in one of the quiet modes
+ described here.  The valid arguments to this option are:
+diff --git a/smartctl.cpp b/smartctl.cpp
+index 4bf5c5c..d1242f7 100644
+--- a/smartctl.cpp
++++ b/smartctl.cpp
+@@ -51,6 +51,7 @@
+ #include "nvmeprint.h"
+ #include "smartctl.h"
+ #include "utility.h"
++//#include "svnversion.h"
+ 
+ const char * smartctl_cpp_cvsid = "$Id: smartctl.cpp 4585 2017-11-04 13:41:03Z chrfranke $"
+   CONFIG_H_CVSID SMARTCTL_H_CVSID;
+@@ -59,9 +60,16 @@ const char * smartctl_cpp_cvsid = "$Id: smartctl.cpp 4585 2017-11-04 13:41:03Z c
+ bool printing_is_switchable = false;
+ bool printing_is_off = false;
+ 
++// Control JSON output
++json jglb;
++static bool print_as_json = false;
++static bool print_as_json_output = false;
++static bool print_as_json_impl = false;
++static bool print_as_json_unimpl = false;
++
+ static void printslogan()
+ {
+-  pout("%s\n", format_version_info("smartctl").c_str());
++  jout("%s\n", format_version_info("smartctl").c_str());
+ }
+ 
+ static void UsageSummary()
+@@ -70,13 +78,45 @@ static void UsageSummary()
+   return;
+ }
+ 
++static void js_initialize(int argc, char **argv)
++{
++  if (jglb.is_enabled())
++    return;
++  jglb.enable();
++
++  // Major.minor version of JSON format
++  jglb["json_format_version"][0] = 0;
++  jglb["json_format_version"][1] = 1;
++
++  // Smartctl version info
++  json::ref jref = jglb["smartctl"];
++  int ver[3] = { 0, 0, 0 };
++  sscanf(PACKAGE_VERSION, "%d.%d.%d", ver, ver+1, ver+2);
++  jref["version"][0] = ver[0];
++  jref["version"][1] = ver[1];
++  if (ver[2] > 0)
++    jref["version"][2] = ver[2];
++
++#ifdef SMARTMONTOOLS_SVN_REV
++  jref["svn_revision"] = SMARTMONTOOLS_SVN_REV;
++#endif
++  jref["platform_info"] = smi()->get_os_version_str();
++#ifdef BUILD_INFO
++  jref["build_info"] = BUILD_INFO;
++#endif
++
++  jref["argv"][0] = "smartctl";
++  for (int i = 1; i < argc; i++)
++    jref["argv"][i] = argv[i];
++}
++
+ static std::string getvalidarglist(int opt);
+ 
+ /*  void prints help information for command syntax */
+ static void Usage()
+ {
+-  printf("Usage: smartctl [options] device\n\n");
+-  printf(
++  pout("Usage: smartctl [options] device\n\n");
++  pout(
+ "============================================ SHOW INFORMATION OPTIONS =====\n\n"
+ "  -h, --help, --usage\n"
+ "         Display this help and exit\n\n"
+@@ -98,8 +138,10 @@ static void Usage()
+ "  --scan-open\n"
+ "         Scan for devices and try to open each device\n\n"
+   );
+-  printf(
++  pout(
+ "================================== SMARTCTL RUN-TIME BEHAVIOR OPTIONS =====\n\n"
++"  -j, --json[=[aiu]]\n"
++"         Print output in JSON format\n\n"
+ "  -q TYPE, --quietmode=TYPE                                           (ATA)\n"
+ "         Set smartctl quiet mode to one of: errorsonly, silent, noserial\n\n"
+ "  -d TYPE, --device=TYPE\n"
+@@ -114,7 +156,7 @@ static void Usage()
+ "  -n MODE[,STATUS], --nocheck=MODE[,STATUS]                           (ATA)\n"
+ "         No check if: never, sleep, standby, idle (see man page)\n\n",
+   getvalidarglist('d').c_str()); // TODO: Use this function also for other options ?
+-  printf(
++  pout(
+ "============================== DEVICE FEATURE ENABLE/DISABLE COMMANDS =====\n\n"
+ "  -s VALUE, --smart=VALUE\n"
+ "        Enable/disable SMART on device (on/off)\n\n"
+@@ -128,7 +170,7 @@ static void Usage()
+ "        standby,[N|off|now], wcache,[on|off], rcache,[on|off],\n"
+ "        wcreorder,[on|off[,p]], wcache-sct,[ata|on|off[,p]]\n\n"
+   );
+-  printf(
++  pout(
+ "======================================= READ AND DISPLAY DATA OPTIONS =====\n\n"
+ "  -H, --health\n"
+ "        Show device SMART health status\n\n"
+@@ -158,13 +200,13 @@ static void Usage()
+     get_drivedb_path_add()
+   );
+ #ifdef SMARTMONTOOLS_DRIVEDBDIR
+-  printf(
++  pout(
+                       "\n"
+ "         and then    %s",
+     get_drivedb_path_default()
+   );
+ #endif
+-  printf(
++  pout(
+          "]\n\n"
+ "============================================ DEVICE SELF-TEST OPTIONS =====\n\n"
+ "  -t TEST, --test=TEST\n"
+@@ -177,7 +219,7 @@ static void Usage()
+ );
+   std::string examples = smi()->get_app_examples("smartctl");
+   if (!examples.empty())
+-    printf("%s\n", examples.c_str());
++    pout("%s\n", examples.c_str());
+ }
+ 
+ // Values for  --long only options, see parse_options()
+@@ -231,6 +273,8 @@ static std::string getvalidarglist(int opt)
+            "wcache-sct,[ata|on|off[,p]]";
+   case 's':
+     return getvalidarglist(opt_smart)+", "+getvalidarglist(opt_set);
++  case 'j':
++    return "a, i, u";
+   case opt_identify:
+     return "n, wn, w, v, wv, wb";
+   case 'v':
+@@ -274,7 +318,7 @@ static const char * parse_options(int argc, char** argv,
+   nvme_print_options & nvmeopts, bool & print_type_only)
+ {
+   // Please update getvalidarglist() if you edit shortopts
+-  const char *shortopts = "h?Vq:d:T:b:r:s:o:S:HcAl:iaxv:P:t:CXF:n:B:f:g:";
++  const char *shortopts = "h?Vq:d:T:b:r:s:o:S:HcAl:iaxv:P:t:CXF:n:B:f:g:j";
+   // Please update getvalidarglist() if you edit longopts
+   struct option longopts[] = {
+     { "help",            no_argument,       0, 'h' },
+@@ -307,6 +351,7 @@ static const char * parse_options(int argc, char** argv,
+     { "drivedb",         required_argument, 0, 'B' },
+     { "format",          required_argument, 0, 'f' },
+     { "get",             required_argument, 0, 'g' },
++    { "json",            optional_argument, 0, 'j' },
+     { "identify",        optional_argument, 0, opt_identify },
+     { "set",             required_argument, 0, opt_set },
+     { "scan",            no_argument,       0, opt_scan      },
+@@ -1047,6 +1092,23 @@ static const char * parse_options(int argc, char** argv,
+       scan = optchar;
+       break;
+ 
++    case 'j':
++      print_as_json = true;
++      print_as_json_output = false;
++      print_as_json_impl = print_as_json_unimpl = false;
++      if (optarg) {
++        for (int i = 0; optarg[i]; i++) {
++          switch (optarg[i]) {
++            case 'a': print_as_json_output = true; break;
++            case 'i': print_as_json_impl = true; break;
++            case 'u': print_as_json_unimpl = true; break;
++            default: badarg = true;
++          }
++        }
++      }
++      js_initialize(argc, argv);
++      break;
++
+     case '?':
+     default:
+       printing_is_off = false;
+@@ -1199,28 +1261,129 @@ static const char * parse_options(int argc, char** argv,
+   return type;
+ }
+ 
+-// Printing function (controlled by global printing_is_off)
+-// [From GLIBC Manual: Since the prototype doesn't specify types for
+-// optional arguments, in a call to a variadic function the default
+-// argument promotions are performed on the optional argument
+-// values. This means the objects of type char or short int (whether
+-// signed or not) are promoted to either int or unsigned int, as
+-// appropriate.]
+-void pout(const char *fmt, ...){
++// Printing functions
++
++static void vjpout(bool is_js_impl, const char * msg_severity,
++                   const char *fmt, va_list ap)
++{
++  if (!print_as_json) {
++    // Print out directly
++    vprintf(fmt, ap);
++    fflush(stdout);
++  }
++  else {
++    // Add lines to JSON output
++    static char buf[1024];
++    static char * bufnext = buf;
++    vsnprintf(bufnext, sizeof(buf) - (bufnext - buf), fmt, ap);
++    for (char * p = buf, *q; ; p = q) {
++      if (!(q = strchr(p, '\n'))) {
++        // Keep remaining line for next call
++        for (bufnext = buf; *p; bufnext++, p++)
++          *bufnext = *p;
++        break;
++      }
++      *q++ = 0; // '\n' -> '\0'
++
++      static int lineno = 0;
++      lineno++;
++      if (print_as_json_output) {
++        // Collect full output in array
++        static int outindex = 0;
++        jglb["smartctl"]["output"][outindex++] = p;
++      }
++      if (!*p)
++        continue; // Skip empty line
++
++      if (msg_severity) {
++        // Collect non-empty messages in array
++        static int errindex = 0;
++        json::ref jref = jglb["smartctl"]["messages"][errindex++];
++        jref["string"] = p;
++        jref["severity"] = msg_severity;
++      }
++
++      if (   ( is_js_impl && print_as_json_impl  )
++          || (!is_js_impl && print_as_json_unimpl)) {
++        // Add (un)implemented non-empty lines to global object
++        jglb[strprintf("smartctl_%04d_%c", lineno,
++                     (is_js_impl ? 'i' : 'u')).c_str()] = p;
++      }
++    }
++  }
++}
++
++// Default: print to stdout
++// --json: ignore
++// --json=a: append to "output" array
++// --json=u: add "smartctl_NNNN_u" element(s)
++void pout(const char *fmt, ...)
++{
++  if (printing_is_off)
++    return;
++  if (print_as_json && !(print_as_json_output
++      || print_as_json_impl || print_as_json_unimpl))
++    return;
++
++  va_list ap;
++  va_start(ap, fmt);
++  vjpout(false, 0, fmt, ap);
++  va_end(ap);
++}
++
++// Default: Print to stdout
++// --json: ignore
++// --json=a: append to "output" array
++// --json=i: add "smartctl_NNNN_i" element(s)
++void jout(const char *fmt, ...)
++{
++  if (printing_is_off)
++    return;
++  if (print_as_json && !(print_as_json_output
++      || print_as_json_impl || print_as_json_unimpl))
++    return;
++
+   va_list ap;
+-  
+-  // initialize variable argument list 
+-  va_start(ap,fmt);
+-  if (printing_is_off) {
+-    va_end(ap);
++  va_start(ap, fmt);
++  vjpout(true, 0, fmt, ap);
++  va_end(ap);
++}
++
++// Default: print to stdout
++// --json: append to "messages"
++// --json=a: append to "output" array
++// --json=i: add "smartctl_NNNN_i" element(s)
++void jinf(const char *fmt, ...)
++{
++  if (printing_is_off)
+     return;
+-  }
+ 
+-  // print out
+-  vprintf(fmt,ap);
++  va_list ap;
++  va_start(ap, fmt);
++  vjpout(true, "information", fmt, ap);
++  va_end(ap);
++}
++
++void jwrn(const char *fmt, ...)
++{
++  if (printing_is_off)
++    return;
++
++  va_list ap;
++  va_start(ap, fmt);
++  vjpout(true, "warning", fmt, ap);
++  va_end(ap);
++}
++
++void jerr(const char *fmt, ...)
++{
++  if (printing_is_off)
++    return;
++
++  va_list ap;
++  va_start(ap, fmt);
++  vjpout(true, "error", fmt, ap);
+   va_end(ap);
+-  fflush(stdout);
+-  return;
+ }
+ 
+ // Globals to set failuretest() policy
+@@ -1366,7 +1529,7 @@ static int main_worker(int argc, char **argv)
+     dev = smi()->get_smart_device(name, type);
+ 
+   if (!dev) {
+-    pout("%s: %s\n", name, smi()->get_errmsg());
++    jerr("%s: %s\n", name, smi()->get_errmsg());
+     if (type)
+       printvalidarglistmessage('d');
+     else
+@@ -1381,7 +1544,7 @@ static int main_worker(int argc, char **argv)
+          dev->get_info_name(), dev->get_dev_type(), get_protocol_info(dev.get()));
+ 
+   if (dev->is_ata() && ataopts.powermode>=2 && dev->is_powered_down()) {
+-    pout("Device is in STANDBY (OS) mode, exit(%d)\n", ataopts.powerexit);
++    jinf("Device is in STANDBY (OS) mode, exit(%d)\n", ataopts.powerexit);
+     return ataopts.powerexit;
+   }
+ 
+@@ -1400,7 +1563,7 @@ static int main_worker(int argc, char **argv)
+         dev->get_info_name(), oldinfo.dev_type.c_str(), dev->get_dev_type());
+   }
+   if (!dev->is_open()) {
+-    pout("Smartctl open device: %s failed: %s\n", dev->get_info_name(), dev->get_errmsg());
++    jerr("Smartctl open device: %s failed: %s\n", dev->get_info_name(), dev->get_errmsg());
+     return FAILDEV;
+   }
+ 
+@@ -1431,12 +1594,17 @@ int main(int argc, char **argv)
+   bool badcode = false;
+ 
+   try {
+-    // Do the real work ...
+-    status = main_worker(argc, argv);
+-  }
+-  catch (int ex) {
+-    // EXIT(status) arrives here
+-    status = ex;
++    try {
++      // Do the real work ...
++      status = main_worker(argc, argv);
++    }
++    catch (int ex) {
++      // EXIT(status) arrives here
++      status = ex;
++    }
++    // Print JSON if enabled
++    jglb["smartctl"]["exit_status"] = status;
++    jglb.print(stdout);
+   }
+   catch (const std::bad_alloc & /*ex*/) {
+     // Memory allocation failed (also thrown by std::operator new)
+diff --git a/smartctl.h b/smartctl.h
+index e379c7e..0062714 100644
+--- a/smartctl.h
++++ b/smartctl.h
+@@ -4,7 +4,7 @@
+  * Home page of code is: http://www.smartmontools.org
+  *
+  * Copyright (C) 2002-10 Bruce Allen
+- * Copyright (C) 2008-10 Christian Franke
++ * Copyright (C) 2008-17 Christian Franke
+  * Copyright (C) 2000 Michael Cornwell <cornwell@acm.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+@@ -95,4 +95,22 @@ inline void print_off()
+     printing_is_off = true;
+ }
+ 
++// The singleton global JSON object
++#include "json.h"
++extern json jglb;
++
++#include "utility.h" // __attribute_format_printf()
++// TODO: move this to a new include file?
++
++// Version of pout() for items already included in JSON output
++void jout(const char *fmt, ...)
++  __attribute_format_printf(1, 2);
++// Version of pout() for info/warning/error messages
++void jinf(const char *fmt, ...)
++  __attribute_format_printf(1, 2);
++void jwrn(const char *fmt, ...)
++__attribute_format_printf(1, 2);
++void jerr(const char *fmt, ...)
++__attribute_format_printf(1, 2);
++
+ #endif
+-- 
+2.8.3
+
