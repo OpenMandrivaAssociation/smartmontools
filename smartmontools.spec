@@ -29,9 +29,7 @@ man smartctl and man smartd will provide more information.
 
 %prep
 %setup -q
-%patch0 -p0
-%patch1 -p1 -b .sysconfig~
-%patch2 -p1 -b .conf~
+%apply_patches
 
 %build
 %configure \

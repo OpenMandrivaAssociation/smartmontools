@@ -1,6 +1,8 @@
---- smartd.service.in.orig	2013-02-24 14:39:27.022465107 +0000
-+++ smartd.service.in	2013-02-24 14:39:38.414465568 +0000
-@@ -3,8 +3,8 @@
+diff --git a/smartd.service.in b/smartd.service.in
+index dc8b143..02c47cd 100644
+--- a/smartd.service.in
++++ b/smartd.service.in
+@@ -4,8 +4,8 @@ Documentation=man:smartd(8) man:smartd.conf(5)
  After=syslog.target
  
  [Service]
