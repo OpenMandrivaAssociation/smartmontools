@@ -13,7 +13,7 @@ Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.pa
 Patch2:		0001-Add-initial-support-for-smartctl-JSON-output-mode-76.patch
 Patch3:		0001-json.h-Add-missing-include.patch
 %rename		smartsuite
-BuildRequires:	pkgconfig(libsystemd)
+BuildRequires:	systemd-macros
 BuildRequires:	libcap-ng-devel
 
 %description
@@ -30,8 +30,7 @@ ATA/ATAPI-7 specifications. The package is intended to incorporate as much
 man smartctl and man smartd will provide more information.
 
 %prep
-%setup -q
-%apply_patches
+%autosetup -p1
 
 %build
 %configure \
@@ -39,12 +38,12 @@ man smartctl and man smartd will provide more information.
 	--with-drivedbdir=yes \
 	--with-update-smart-drivedb=yes \
 	--with-initscriptdir=no \
-	--with-systemdsystemunitdir=%{_systemunitdir}
+	--with-systemdsystemunitdir=%{_unitdir}
 
-%make BUILD_INFO='"(%{distribution} %{version}-%{release})"'
+%make_build BUILD_INFO='"(%{distribution} %{version}-%{release})"'
 
 %install
-%makeinstall_std
+%make_install
 install -p -m644 %{SOURCE2} -D %{buildroot}%{_sysconfdir}/sysconfig/smartd
 
 install -d %{buildroot}%{_presetdir}
@@ -56,7 +55,7 @@ EOF
 %config(noreplace) %{_sysconfdir}/smartd.conf
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
-%attr(0644,root,root) %{_systemunitdir}/smartd.service
+%attr(0644,root,root) %{_unitdir}/smartd.service
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
 %{_mandir}/man?/*
