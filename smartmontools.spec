@@ -8,13 +8,17 @@ URL:		http://smartmontools.sourceforge.net/
 Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
 Source1:	%{name}.rpmlintrc
 Source2:	smartd.sysconfig
+#semi-automatic update of drivedb.h
+%global		UrlSource3 https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
+# (tpg) pull it from https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
+Source3:	drivedb.h
 Patch0:		smartmontools-6.0-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 Patch2:		0001-Add-initial-support-for-smartctl-JSON-output-mode-76.patch
 Patch3:		0001-json.h-Add-missing-include.patch
 %rename		smartsuite
 BuildRequires:	systemd-macros
-BuildRequires:	libcap-ng-devel
+BuildRequires:	pkgconfig(libcap-ng)
 
 %description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
@@ -31,6 +35,8 @@ man smartctl and man smartd will provide more information.
 
 %prep
 %autosetup -p1
+curl %{UrlSource3} -o %{SOURCE3} ||:
+cp %{SOURCE3} .
 
 %build
 %configure \
