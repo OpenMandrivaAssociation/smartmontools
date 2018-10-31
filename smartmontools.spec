@@ -19,6 +19,7 @@ Patch3:		0001-json.h-Add-missing-include.patch
 %rename		smartsuite
 BuildRequires:	systemd-macros
 BuildRequires:	pkgconfig(libcap-ng)
+BuildRequires:	curl
 
 %description
 SMARTmontools controls and monitors storage devices using the Self-Monitoring,
