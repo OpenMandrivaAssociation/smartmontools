@@ -9,7 +9,7 @@ Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}
 Source1:	%{name}.rpmlintrc
 Source2:	smartd.sysconfig
 #semi-automatic update of drivedb.h
-%global		UrlSource3 https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
+%global		UrlSource3 https://raw.githubusercontent.com/smartmontools/smartmontools/master/smartmontools/drivedb.h
 # (tpg) pull it from https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
 Source3:	drivedb.h
 Patch0:		smartmontools-6.0-service.patch
