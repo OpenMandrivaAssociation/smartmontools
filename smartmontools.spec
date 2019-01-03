@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	6.6
-Release:	6
+Version:	7.0
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
