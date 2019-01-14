@@ -14,8 +14,6 @@ Source2:	smartd.sysconfig
 Source3:	drivedb.h
 Patch0:		smartmontools-6.0-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
-Patch2:		0001-Add-initial-support-for-smartctl-JSON-output-mode-76.patch
-Patch3:		0001-json.h-Add-missing-include.patch
 %rename		smartsuite
 BuildRequires:	systemd-macros
 BuildRequires:	pkgconfig(libcap-ng)
@@ -45,7 +43,11 @@ cp %{SOURCE3} .
 	--with-drivedbdir=yes \
 	--with-update-smart-drivedb=yes \
 	--with-initscriptdir=no \
-	--with-systemdsystemunitdir=%{_unitdir}
+	--with-libsystemd \
+	--with-systemdsystemunitdir=%{_unitdir} \
+	--with-nvme-devicescan \
+	--with-smartdscriptdir=%{_libexecdir}/%{name} \
+	--with-smartdplugindir=%{_libexecdir}/%{name}
 
 %make_build BUILD_INFO='"(%{distribution} %{version}-%{release})"'
 
@@ -60,9 +62,9 @@ EOF
 
 %files
 %config(noreplace) %{_sysconfdir}/smartd.conf
-%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/smartd_warning.sh
 %attr(0644,root,root) %config(noreplace) %{_sysconfdir}/sysconfig/smartd
 %attr(0644,root,root) %{_unitdir}/smartd.service
+%{_libexecdir}/%{name}
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
 %{_mandir}/man?/*
