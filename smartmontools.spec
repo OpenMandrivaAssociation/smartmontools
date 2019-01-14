@@ -17,6 +17,7 @@ Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.pa
 %rename		smartsuite
 BuildRequires:	systemd-macros
 BuildRequires:	pkgconfig(libcap-ng)
+BuildRequires:	pkgconfig(libsystemd)
 BuildRequires:	curl
 
 %description
