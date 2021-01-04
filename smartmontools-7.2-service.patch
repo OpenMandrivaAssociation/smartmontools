@@ -1,0 +1,14 @@
+diff -uraN smartmontools-7.2/smartd.service.in omv-smartmontools-7.2/smartd.service.in
+--- smartmontools-7.2/smartd.service.in	2020-08-22 15:27:05.000000000 +0200
++++ omv-smartmontools-7.2/smartd.service.in	2021-01-04 15:11:34.854850695 +0100
+@@ -5,8 +5,8 @@
+ 
+ [Service]
+ Type=notify
+-EnvironmentFile=-/usr/local/etc/sysconfig/smartmontools
+-ExecStart=/usr/local/sbin/smartd -n $smartd_opts
++EnvironmentFile=-/etc/sysconfig/smartd
++ExecStart=/usr/sbin/smartd -n $SMARTD_OPTIONS
+ ExecReload=/bin/kill -HUP $MAINPID
+ 
+ [Install]
