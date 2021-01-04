@@ -12,7 +12,7 @@ Source2:	smartd.sysconfig
 %global		UrlSource3 https://raw.githubusercontent.com/smartmontools/smartmontools/master/smartmontools/drivedb.h
 # (tpg) pull it from https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
 Source3:	drivedb.h
-Patch0:		smartmontools-6.0-service.patch
+Patch0:		smartmontools-7.2-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
 BuildRequires:	systemd-macros
