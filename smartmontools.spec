@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
 Version:	7.2
-Release:	1
+Release:	2
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -60,6 +60,15 @@ install -d %{buildroot}%{_presetdir}
 cat > %{buildroot}%{_presetdir}/86-smartd.preset << EOF
 enable smartd.service
 EOF
+
+%preun
+%systemd_preun smartd.service
+
+%post
+%systemd_post smartd.service
+
+%postun
+%systemd_postun_with_restart smartd.service
 
 %files
 %config(noreplace) %{_sysconfdir}/smartd.conf
