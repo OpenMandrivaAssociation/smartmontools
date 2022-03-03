@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	7.2
-Release:	2
+Version:	7.3
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -15,7 +15,7 @@ Source3:	drivedb.h
 Patch0:		smartmontools-7.2-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
-BuildRequires:	systemd-macros
+BuildRequires:	systemd-rpm-macros
 BuildRequires:	pkgconfig(libcap-ng)
 BuildRequires:	pkgconfig(libsystemd)
 BuildRequires:	curl
@@ -77,6 +77,6 @@ EOF
 %{_libexecdir}/%{name}
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
-%{_mandir}/man?/*
+%doc %{_mandir}/man?/*
 %{_docdir}/%{name}
 %{_datadir}/%{name}/drivedb.h
