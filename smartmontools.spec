@@ -1,7 +1,7 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
 Version:	7.3
-Release:	2
+Release:	3
 License:	GPLv2+
 Group:		System/Kernel and hardware
 URL:		http://smartmontools.sourceforge.net/
@@ -78,5 +78,5 @@ EOF
 %{_presetdir}/86-smartd.preset
 %{_sbindir}/*
 %doc %{_mandir}/man?/*
-%{_docdir}/%{name}
+%doc %{_docdir}/%{name}
 %{_datadir}/%{name}/drivedb.h
