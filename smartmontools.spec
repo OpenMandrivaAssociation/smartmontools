@@ -1,17 +1,17 @@
 Summary:	For monitoring S.M.A.R.T. disks and devices
 Name:		smartmontools
-Version:	7.3
-Release:	4
+Version:	7.4
+Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
-URL:		http://smartmontools.sourceforge.net/
-Source0:	http://heanet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.gz
+URL:		http://smartmontools.org/
+Source0:	https://downloads.sourceforge.net/project/smartmontools/smartmontools/%{version}/smartmontools-%{version}.tar.gz
 Source1:	%{name}.rpmlintrc
 Source2:	smartd.sysconfig
 #semi-automatic update of drivedb.h
 %global		UrlSource3 https://raw.githubusercontent.com/smartmontools/smartmontools/master/smartmontools/drivedb.h
 # (tpg) pull it from https://github.com/smartmontools/smartmontools/blob/master/smartmontools/drivedb.h
-Source3:	drivedb.h
+Source3:	https://raw.githubusercontent.com/smartmontools/smartmontools/master/smartmontools/drivedb.h
 Patch0:		smartmontools-7.2-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
