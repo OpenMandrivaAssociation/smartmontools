@@ -4,7 +4,7 @@ Version:	7.4
 Release:	1
 License:	GPLv2+
 Group:		System/Kernel and hardware
-URL:		http://smartmontools.org/
+URL:		https://smartmontools.org/
 Source0:	https://downloads.sourceforge.net/project/smartmontools/smartmontools/%{version}/smartmontools-%{version}.tar.gz
 Source1:	%{name}.rpmlintrc
 Source2:	smartd.sysconfig
