@@ -15,6 +15,11 @@ Source3:	https://raw.githubusercontent.com/smartmontools/smartmontools/master/sm
 Patch0:		smartmontools-7.2-service.patch
 Patch1:		smartmontools-6.2-keep-automatic-offline-tests-and-attribute-save-on.patch
 %rename		smartsuite
+BuildRequires:	autoconf
+BuildRequires:	automake
+BuildRequires:	libtool-base
+BuildRequires:	slibtool
+BuildRequires:	make
 BuildRequires:	systemd-rpm-macros
 BuildRequires:	pkgconfig(libcap-ng)
 BuildRequires:	pkgconfig(libsystemd)
